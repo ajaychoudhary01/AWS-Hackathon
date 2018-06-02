@@ -1,0 +1,5 @@
+D:\Projects\CryptoTransChatBot\CryptoTransChatBot\bin\CryptoTransChatBot.dll
+D:\Projects\CryptoTransChatBot\CryptoTransChatBot\bin\CryptoTransChatBot.pdb
+D:\Projects\CryptoTransChatBot\CryptoTransChatBot\obj\Debug\CryptoTransChatBot.dll
+D:\Projects\CryptoTransChatBot\CryptoTransChatBot\obj\Debug\CryptoTransChatBot.pdb
+D:\Projects\CryptoTransChatBot\CryptoTransChatBot\bin\CryptoTransChatBot.dll.config
