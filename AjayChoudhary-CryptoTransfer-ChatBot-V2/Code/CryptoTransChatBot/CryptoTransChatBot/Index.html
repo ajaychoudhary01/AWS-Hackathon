@@ -8,8 +8,17 @@
     <link rel="icon" type="image/png" href="/Resources/favicon-32x32.png" />
     <link rel="icon" type="image/png" href="/Resources/favicon-16x16.png" sizes="16x16" />
     <link href="/Resources/style.css" rel="stylesheet" />
+    <style>
+        pre#log {
+            height: 500px;
+            overflow: auto;
+            font-size: 1.2em;
+        }
+    </style>
+
 </head>
 <body class="wrapper">
+    <pre id="log"></pre>
     <div class="audio-control">
         <p id="audio-control" class="white-circle">
             <img src="/Resources/chatbot.png">
@@ -18,7 +27,7 @@
         <p><span id="message"></span></p>
     </div>
     <script src="https://sdk.amazonaws.com/js/aws-sdk-2.48.0.min.js"></script>
-    <script src="/Scripts/SDK/dist/aws-lex-audio.min.js"></script>
+    <script src="/Scripts/SDK/dist/aws-lex-audio.js"></script>
     <script src="/Scripts/SDK/renderer.js"></script>
     <script type="text/javascript">
         var waveform = window.Waveform();
@@ -28,11 +37,11 @@
 
         document.getElementById('audio-control').onclick = function () {
 
-            AWS.config.credentials = new AWS.Credentials('AKIAIHJRLYX4XHHNEXVQ', 'CPS33nL3BgnEHKvERxxpOw9pVJlG26XYgak8fYVh', null);
+            AWS.config.credentials = new AWS.Credentials('AKIAYC6ZAUK5C5AI7KVP', 'piDJJ5dZLSKTrX6mUemHJM8S35kf6lsOHp5Hq4sQ', null);
             AWS.config.region = 'eu-west-1';
 
             config = {
-                lexConfig: { botName: 'CryptoTransferChatBot' }
+                lexConfig: { botName: 'AgileBot' }
             };
 
             conversation = new LexAudio.conversation(config, function (state) {

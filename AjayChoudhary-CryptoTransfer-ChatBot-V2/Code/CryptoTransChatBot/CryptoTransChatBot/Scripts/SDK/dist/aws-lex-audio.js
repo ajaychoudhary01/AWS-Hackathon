@@ -1,7 +1,7 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 (function () {
   'use strict';
-  var rec = require('./lib/recorder.js');
+  var rec = require('./recorder.js');
   var recorder, audioRecorder, checkAudioSupport, audioSupported, playbackSource, UNSUPPORTED = 'Audio is not supported.';
 
   /**
@@ -329,11 +329,115 @@
     };
   };
 
+  function addAudioPlayer(blob) {
+      var url = URL.createObjectURL(blob);
+      var log = document.getElementById('log');
+
+      var audio = document.querySelector('#replay');
+      if (audio != null) { audio.parentNode.removeChild(audio); }
+
+      audio = document.createElement('audio');
+      audio.setAttribute('id', 'replay');
+      audio.setAttribute('controls', 'controls');
+
+      var source = document.createElement('source');
+      source.src = url;
+
+      audio.appendChild(source);
+      log.parentNode.insertBefore(audio, log);
+  }
+
+  function getProfilesForDynamoDb() {
+      var ddb = new AWS.DynamoDB({ apiVersion: '2012-08-10' });
+
+      var params = {
+          TableName: 'agilebotusers'
+      };
+      var ids = [];
+      ddb.scan(params, function (err, data) {
+          if (err) {
+              console.log("Error", err);
+          } else {
+              data.Items.forEach(function (element, index, array) {
+                  ids.push(element.id.S);
+                  window.localStorage.setItem('ids', ids);
+              });
+          }
+      });
+      return ids;
+  }
+  function getIds(state) {
+      var ids = window.localStorage.getItem('ids');
+      if (ids === undefined || ids === null) {
+          ids = getProfilesForDynamoDb();
+          console.log('call to dynamodb');
+      }
+      verifyIdentity(ids, state);
+  }
+
+  function verifyIdentity(ids, state) {
+      var identify = 'https://westus.api.cognitive.microsoft.com/spid/v1.0/identify?identificationProfileIds='
+          + ids
+          + '&shortAudio=true';
+
+      var request = new XMLHttpRequest();
+      request.open("POST", identify, true);
+
+      request.setRequestHeader('Content-Type', 'application/json');
+      request.setRequestHeader('Ocp-Apim-Subscription-Key', '823fcc2deb274fcd95c57966c5329dd0');
+
+      request.onload = function () {
+          // The response contains a location to poll for status
+          var location = request.getResponseHeader('Operation-Location');
+
+          if (location === null || location === null) {
+              return;
+          }
+          var identifiedInterval;
+
+          // hit the endpoint every few seconds 
+          identifiedInterval = setInterval(function () {
+              var request1 = new XMLHttpRequest();
+              request1.open("GET", location, true);
+
+              request1.setRequestHeader('Content-Type', 'multipart/form-data');
+              request1.setRequestHeader('Ocp-Apim-Subscription-Key', '823fcc2deb274fcd95c57966c5329dd0');
+
+              request1.onload = function () {
+
+                  var json = JSON.parse(request1.responseText);
+                  if (json.status === 'succeeded') {
+                      // Identification process has completed
+                      clearInterval(identifiedInterval);
+                      state.lexConfig.inputStream = state.audioInput;
+                      state.lexConfig.userId = json.processingResult.identifiedProfileId;
+                      lexruntime.postContent(state.lexConfig, function (err, data) {
+                          if (err) {
+                              state.onError(err);
+                              state.transition(new Initial(state));
+                          } else {
+                              state.audioOutput = data;
+                              state.transition(new Speaking(state));
+                              state.onSuccess(data);
+                          }
+                      });
+                  }
+              };
+
+              request1.send();
+          }, 500);
+
+      };
+
+      request.send(state.audioInput);
+  }
+
   var Listening = function(state) {
     this.state = state;
     state.message = state.messages.LISTENING;
     this.advanceConversation = function() {
-      audioControl.exportWAV(function(blob) {
+        audioControl.exportWAV(function (blob) {
+        addAudioPlayer(blob);
         state.audioInput = blob;
         state.transition(new Sending(state));
       });
@@ -343,18 +447,8 @@
   var Sending = function(state) {
     this.state = state;
     state.message = state.messages.SENDING;
-    this.advanceConversation = function() {
-      state.lexConfig.inputStream = state.audioInput;
-      lexruntime.postContent(state.lexConfig, function(err, data) {
-        if (err) {
-          state.onError(err);
-          state.transition(new Initial(state));
-        } else {
-          state.audioOutput = data;
-          state.transition(new Speaking(state));
-          state.onSuccess(data);
-        }
-      });
+    this.advanceConversation = function () {
+        getIds(state);
     };
   };
 
@@ -707,7 +801,7 @@ module.exports = function (self) {
     var mergedBuffers = mergeBuffers(recBuffer, recLength);
     var downsampledBuffer = downsampleBuffer(mergedBuffers, exportSampleRate);
     var encodedWav = encodeWAV(downsampledBuffer);
-    var audioBlob = new Blob([encodedWav], {type: 'application/octet-stream'});
+    var audioBlob = new Blob([encodedWav], {type: 'audio/wav'});
     postMessage(audioBlob);
   }
 
@@ -774,8 +868,8 @@ module.exports = function (self) {
     view.setUint32(16, 16, true);
     view.setUint16(20, 1, true);
     view.setUint16(22, 1, true);
-    view.setUint32(24, recordSampleRate, true);
-    view.setUint32(28, recordSampleRate * 2, true);
+    view.setUint32(24, 16000, true);
+    view.setUint32(28, 16000 * 2, true);
     view.setUint16(32, 2, true);
     view.setUint16(34, 16, true);
     writeString(view, 36, 'data');
